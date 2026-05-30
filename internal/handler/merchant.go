@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -10,12 +11,18 @@ import (
 	"checkout-service/internal/repository"
 )
 
+// === ИНТЕРФЕЙС ЗДЕСЬ (потребитель) ===
+// Он описывает, что хендлеру нужно от репозитория
+type merchantRepo interface {
+	GetByID(ctx context.Context, id string) (*repository.Merchant, error)
+}
+
 type MerchantHandler struct {
-	repo repository.MerchantRepository
+	repo merchantRepo
 }
 
 // Конструктор теперь принимает интерфейс репозитория
-func NewMerchantHandler(repo repository.MerchantRepository) *MerchantHandler {
+func NewMerchantHandler(repo merchantRepo) *MerchantHandler {
 	return &MerchantHandler{repo: repo}
 }
 
@@ -50,6 +57,7 @@ func (h *MerchantHandler) GetMerchant(w http.ResponseWriter, r *http.Request) {
 		logger.Error("Failed to encode response", "err", err)
 	}
 }
+
 func (h *MerchantHandler) writeError(w http.ResponseWriter, code int, err error, logger *slog.Logger) {
 	logger.Warn("Handler error", "error", err.Error(), "status", code)
 	w.Header().Set("Content-Type", "application/json")

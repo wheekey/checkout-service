@@ -1,4 +1,4 @@
-.PHONY: run test lint build
+.PHONY: stop run test lint build
 
 run:
 	go run cmd/server/main.go
@@ -11,3 +11,6 @@ lint:
 
 build:
 	go build -o bin/server cmd/server/main.go
+
+stop:
+	@kill $$(lsof -t -i:8082) 2>/dev/null || true
