@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -23,38 +24,32 @@ func (h *MerchantHandler) GetMerchant(w http.ResponseWriter, r *http.Request) {
 	corrID := r.Header.Get("X-Correlation-ID")
 	logger := slog.With("correlation_id", corrID)
 
-	// Получаем ID из URL (Go 1.22+)
-	// Если у тебя 1.21, см. примечание ниже
 	id := r.PathValue("id")
 	if id == "" {
 		h.writeError(w, http.StatusBadRequest, domain.ErrInvalidInput, logger)
 		return
 	}
 
-	// Вызываем репозиторий напрямую
-	merchant, err := h.repo.GetByID(ctx, id)
+	// 1. Получаем данные
+	merch, err := h.repo.GetByID(ctx, id)
 	if err != nil {
-		// Маппинг ошибок БД на ошибки домена/HTTP
-		// Если в репозитории вернули строку "merchant not found", можно проверять через strings.Contains,
-		// но лучше, если репозиторий возвращает доменные ошибки (domain.ErrNotFound).
 		if errors.Is(err, domain.ErrNotFound) || err.Error() == "merchant not found" {
 			h.writeError(w, http.StatusNotFound, domain.ErrNotFound, logger)
 		} else {
-			// Любая другая ошибка (БД упала, сеть) -> 500
 			logger.Error("Repository error", "err", err)
 			h.writeError(w, http.StatusInternalServerError, domain.ErrInternalServer, logger)
 		}
 		return
 	}
 
-	// Успех: отдаём JSON
+	// 2. Отдаём успешный ответ с данными
+	// Переименовал переменную в 'merch', чтобы не путалась с пакетом 'merchant'
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	// В реальном коде здесь: json.NewEncoder(w).Encode(merchant)
-	// Для теста пока заглушка или раскомментируй, если нужно:
-	// json.NewEncoder(w).Encode(merchant)
+	if err := json.NewEncoder(w).Encode(merch); err != nil {
+		logger.Error("Failed to encode response", "err", err)
+	}
 }
-
 func (h *MerchantHandler) writeError(w http.ResponseWriter, code int, err error, logger *slog.Logger) {
 	logger.Warn("Handler error", "error", err.Error(), "status", code)
 	w.Header().Set("Content-Type", "application/json")
