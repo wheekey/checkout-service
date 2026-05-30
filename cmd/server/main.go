@@ -1,15 +1,19 @@
 package main
 
 import (
+	"log"
 	"log/slog"
 	"os"
 
-	"github.com/wheekey/checkout-service/internal/config"
-	"github.com/wheekey/checkout-service/internal/server"
+	"checkout-service/internal/config"
+	"checkout-service/internal/server"
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal("❌ Ошибка конфига: ", err)
+	}
 
 	slog.Info("Loading configuration", "port", cfg.Port, "log_level", cfg.LogLevel)
 
