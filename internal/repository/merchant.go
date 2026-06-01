@@ -3,7 +3,6 @@ package repository
 import (
 	"checkout-service/internal/domain"
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -61,7 +60,7 @@ func (r *MerchantRepo) DeductBalance(ctx context.Context, id string, amount int)
 
 	// 4. Проверка бизнес-логики
 	if currentBalance < amount {
-		return errors.New("insufficient balance")
+		return domain.ErrInsufficientBalance
 	}
 
 	// 5. Обновляем баланс
