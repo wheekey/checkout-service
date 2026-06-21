@@ -2,10 +2,14 @@ package main
 
 import (
 	"checkout-service/internal/db"
+	"checkout-service/internal/worker"
+	"context"
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime" // 🆕 Добавь этот импорт
+	"syscall"
 
 	"checkout-service/internal/config"
 	"checkout-service/internal/server"
@@ -37,6 +41,30 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("Migrations applied successfully")
+
+	// 🆕 Создаём контекст с обработкой сигналов
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// 🆕 Запуск воркер-пула ВЫШЕ server.Run()
+	pool := worker.NewPool(4, 100)
+	pool.Start(ctx)
+	defer pool.Stop() // Выполнится при выходе из main()
+
+	// Пример: отправляем задачу
+	go func() {
+		pool.Submit(worker.Task{ID: "order_123", Amount: 1000})
+	}()
+
+	// Пример: читаем результаты
+	go func() {
+		for result := range pool.Results() {
+			slog.Info("Task completed",
+				"task_id", result.TaskID,
+				"output", result.Output,
+				"error", result.Err)
+		}
+	}()
 
 	if err := server.Run(cfg); err != nil {
 		slog.Error("Server exited with error", "err", err)
