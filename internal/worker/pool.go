@@ -2,8 +2,10 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 )
 
 // Pool — воркер-пул с паттерном Fan-out/Fan-in
@@ -95,4 +97,15 @@ func (p *Pool) Stop() {
 		close(p.results)
 		slog.Info("Worker pool stopped")
 	})
+}
+
+// SubmitWithTimeout отправляет задачу с таймаутом
+// [Concurrency] Если буфер полон, ждём максимум timeout
+func (p *Pool) SubmitWithTimeout(task Task, timeout time.Duration) error {
+	select {
+	case p.tasks <- task:
+		return nil // успешно отправили
+	case <-time.After(timeout):
+		return fmt.Errorf("timeout: could not submit task %s", task.ID)
+	}
 }
