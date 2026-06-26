@@ -45,7 +45,6 @@ func (p *Pool) Start(ctx context.Context) {
 	slog.Info("Worker pool started", "workers", p.workers)
 }
 
-// worker — отдельный воркер
 func (p *Pool) worker(ctx context.Context, id int) {
 	defer p.wg.Done()
 
@@ -56,11 +55,34 @@ func (p *Pool) worker(ctx context.Context, id int) {
 			return
 		case task, ok := <-p.tasks:
 			if !ok {
-				slog.Info("Tasks channel closed, worker exiting", "worker_id", id)
+				// Канал закрыт — дорабатываем оставшиеся задачи в буфере
+				slog.Info("Tasks channel closed, draining remaining tasks", "worker_id", id)
+				p.drainRemainingTasks(id)
 				return
 			}
 			result := p.processTask(task)
 			p.results <- result
+		}
+	}
+}
+
+// drainRemainingTasks дорабатывает все оставшиеся задачи в буфере
+func (p *Pool) drainRemainingTasks(workerID int) {
+	for {
+		select {
+		case task, ok := <-p.tasks:
+			if !ok {
+				// Буфер пуст
+				slog.Info("No more tasks to drain", "worker_id", workerID)
+				return
+			}
+			slog.Debug("Draining task", "task_id", task.ID, "worker_id", workerID)
+			result := p.processTask(task)
+			p.results <- result
+		default:
+			// Буфер пуст на данный момент
+			slog.Info("Buffer drained", "worker_id", workerID)
+			return
 		}
 	}
 }
@@ -107,5 +129,46 @@ func (p *Pool) SubmitWithTimeout(task Task, timeout time.Duration) error {
 		return nil // успешно отправили
 	case <-time.After(timeout):
 		return fmt.Errorf("timeout: could not submit task %s", task.ID)
+	}
+}
+
+// StopGraceful корректно останавливает пул без потерь задач.
+// [Concurrency] 3-шаговый graceful shutdown:
+// 1. close(tasks) — воркеры перестают брать НОВЫЕ задачи
+// 2. wg.Wait() — ждём, пока воркеры доработают ТЕКУЩИЕ задачи
+// 3. close(results) — закрываем канал результатов
+func (p *Pool) StopGraceful() {
+	p.stopOnce.Do(func() {
+		slog.Info("Graceful shutdown started")
+
+		// 1. Закрываем канал задач
+		close(p.tasks)
+		slog.Info("Tasks channel closed, workers will finish current tasks")
+
+		// 2. Ждём завершения всех воркеров
+		p.wg.Wait()
+		slog.Info("All workers finished")
+
+		// 3. Закрываем канал результатов
+		close(p.results)
+		slog.Info("Graceful shutdown completed")
+	})
+}
+
+// StopWithTimeout останавливает пул с таймаутом.
+// Если воркеры не успели завершиться за timeout — возвращает ошибку.
+func (p *Pool) StopWithTimeout(timeout time.Duration) error {
+	done := make(chan struct{})
+
+	go func() {
+		p.StopGraceful()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil // Успешно завершили
+	case <-time.After(timeout):
+		return fmt.Errorf("shutdown timeout after %v", timeout)
 	}
 }
