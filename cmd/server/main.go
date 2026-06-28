@@ -1,7 +1,9 @@
 package main
 
 import (
+	"checkout-service/internal/config"
 	"checkout-service/internal/db"
+	"checkout-service/internal/server"
 	"checkout-service/internal/worker"
 	"context"
 	"log"
@@ -10,9 +12,6 @@ import (
 	"os/signal"
 	"runtime" // 🆕 Добавь этот импорт
 	"syscall"
-
-	"checkout-service/internal/config"
-	"checkout-service/internal/server"
 )
 
 func main() {

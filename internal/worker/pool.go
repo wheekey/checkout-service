@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"checkout-service/internal/metrics"
 	"context"
 	"fmt"
 	"log/slog"
@@ -47,6 +48,10 @@ func (p *Pool) Start(ctx context.Context) {
 
 func (p *Pool) worker(ctx context.Context, id int) {
 	defer p.wg.Done()
+
+	// Увеличиваем счётчик активных воркеров
+	metrics.ActiveWorkers.Inc()
+	defer metrics.ActiveWorkers.Dec()
 
 	for {
 		select {
