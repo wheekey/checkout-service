@@ -8,8 +8,7 @@ import (
 
 // Твоя структура
 type errResp struct {
-	// Здесь int, а не *int. Это значит, что поле НЕ МОЖЕТ быть nil.
-	Code    string `json:"code,omitempty"`
+	Code    int    `json:"code,omitempty"` // ← указатель!
 	Error   string `json:"error"`
 	Message string `json:"message"`
 }

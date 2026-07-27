@@ -27,7 +27,7 @@ func Run(cfg *config.Config) error {
 	defer cancel()
 
 	// 1. Подключаем БД
-	pool, err := db.NewPool(ctx, cfg.DBURL)
+	pool, err := db.NewPool(ctx, db.DefaultPoolConfig(cfg.DBURL))
 	if err != nil {
 		slog.Error("DB connection failed", "err", err)
 		os.Exit(1)

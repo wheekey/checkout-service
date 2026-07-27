@@ -189,7 +189,7 @@ func (p *Pool) StopWithTimeout(timeout time.Duration) error {
 }
 
 // GetProcessedCount возвращает количество обработанных задач
-func (p *Pool) GetProcessedCount() int {
+func (p *Pool) GetProcessedCount() int64 {
 	// 🆕 Атомарное чтение (в 20 раз быстрее Mutex)
 	return p.processedCount.Load()
 }
